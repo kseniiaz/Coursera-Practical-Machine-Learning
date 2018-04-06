@@ -1,0 +1,88 @@
+---
+title: "Coursera Prediction Assignment - Kseniia Z"
+output: html_document
+---
+
+#Summary
+
+This project is aimed to analyze the data collected from accelerometers on the belt, forearm, arm, and dumbell of 6 participants, and build predictive model desribing the manner in which each participant did the exercise. Random Forest prediction method was used, and results show that this algorithm has high accuracy rate when applied to the test subset.
+
+#Loading and cleaning data
+
+We will use standard functions from 'caret' and 'randomForest' libraries to accomplish this exercise.
+
+```{r echo = TRUE, warning=FALSE, message=FALSE}
+library(caret)
+library(randomForest)
+```
+
+Loading dataset that will be used to train the model.
+
+```{r echo = TRUE}
+train<-read.csv("pml-training.csv",na.strings=c("NA","#DIV/0!", ""))
+```
+
+A lot of columns in training dataset contian NA values, we will eliminate them and focus only on meaningful variables.
+
+```{r echo = TRUE}
+train_cleaned<-as.data.frame(matrix(nrow=nrow(train),ncol=0))
+
+for (i in 1:ncol(train)){
+  na_rate<-sum(is.na(train[i]))
+  if (!(na_rate/nrow(train)>0.8)){
+    train_cleaned<-cbind(train_cleaned,train[i])
+  }
+}
+```
+
+Obtained cleaned training dataset has 60 columns instead of 160 originally. We will also remove irrelevant columns such as row number, timestamp and window.
+
+```{r echo = TRUE}
+train_cleaned<-train_cleaned[,!(names(train_cleaned) %in% c("X","raw_timestamp_part_1","raw_timestamp_part_2",
+                                                      "cvtd_timestamp","new_window","num_window"))]
+
+```
+
+#Building Prediction Model 
+
+For this assignment we will focus on 'classe' feature and will try to predict it based on other variables. Calling function table() to get information on the values that 'classe' may contain.
+
+```{r echo = TRUE}
+table(train$classe)
+```
+
+There are 5 different types of values in the 'classe' variable. Since train data set contains a lot of features measured on the different scale, we will use Random Forest method to build prediction model.
+
+First, we will do the partition of train data set into two subsets: 80% of the data will be used to build the model, and the rest 20% will be used to measure model accuracy.
+
+```{r echo = TRUE}
+set.seed(2323)
+subsets <- createDataPartition(train_cleaned$classe, p=0.8, list=FALSE)
+train_subset<-train_cleaned[subsets,]
+test_subset<-train_cleaned[-subsets,]
+random_forest_model <- randomForest(classe ~. , data=train_subset, method="class")
+```
+
+Now we will apply this model to the test subset in order to see how well model is performing.
+
+```{r echo = TRUE}
+model_prediction<-predict(random_forest_model,test_subset)
+confusionMatrix(model_prediction,test_subset$classe)
+```
+
+The model seems to perform really well, with 99% accuracy rate. Will can use it to predict 'classe' for 20 observations from control test data set.
+
+```{r echo = TRUE}
+test<-read.csv("pml-testing.csv",na.strings=c("NA","#DIV/0!", ""))
+control_test<-test[,names(test) %in% names(train_cleaned)]
+model_prediction<-predict(random_forest_model,control_test)
+
+nc<-ncol(control_test)+1
+control_test[nc]<-model_prediction
+names(control_test)[nc]<-"classe"
+
+control_test$classe
+```
+
+
+
